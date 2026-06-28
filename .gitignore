@@ -1,0 +1,34 @@
+# Environment
+.env
+*.key
+*.secret
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+
+# Runtime artifacts
+sandbox_run.py
+runtime_script.py
+*.db
+*.db-journal
+
+# Kill switch (never commit the real one)
+KILLSWITCH.flag
+
+# Logs (generated, not source)
+audit.log
+logs/
+
+# Local model cache
+.ollama/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
