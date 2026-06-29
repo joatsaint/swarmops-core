@@ -31,6 +31,9 @@ logs/
 # Internal project management (never public)
 STATUS.md
 
+# Private career documents (interview prep, resume strategy — not for public repos)
+docs/SKILLS_AND_PROFESSIONAL_VALUE.md
+
 # OS
 .DS_Store
 Thumbs.db
