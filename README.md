@@ -58,15 +58,15 @@ PLAN → EXECUTE → AUDIT
 
 ## Build Milestones
 
-- [ ] **Milestone 1** — Free Core Framework: state machine + command-filtering system + open GitHub repo
-- [ ] **Milestone 2** — Paid Config Packs: Active Directory onboarding + network compliance auditing
-- [ ] **Milestone 3** — Enterprise Pitch Layer: Docker sandboxing + SQLite compliance ledger exports
+- [ ] **Milestone 1** — Core Engine: command whitelist, self-correction loop, audit ledger
+- [ ] **Milestone 2** — Domain Templates: Active Directory agent, network compliance agent
+- [ ] **Milestone 3** — Hardening Layer: Docker isolation, compliance audit exports
 
 ---
 
 ## Status
 
-See `STATUS.md` for current build state.
+Early build. Core controls not yet implemented. Follow progress on [LinkedIn](https://www.linkedin.com/in/randyskiles/).
 
 ---
 
