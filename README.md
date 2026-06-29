@@ -66,7 +66,7 @@ PLAN → EXECUTE → AUDIT
 
 ## Status
 
-Early build. Core controls not yet implemented. Follow progress on [LinkedIn](https://www.linkedin.com/in/randyskiles/).
+Early build. Core controls not yet implemented. Follow progress on [LinkedIn](https://www.linkedin.com/in/randy-skiles).
 
 ---
 
