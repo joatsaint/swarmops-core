@@ -17,6 +17,9 @@ sandbox_run.py
 runtime_script.py
 *.db
 *.db-journal
+draft.txt
+dispatched_drafts/
+watch_folder/
 
 # Kill switch (never commit the real one)
 KILLSWITCH.flag

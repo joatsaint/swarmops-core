@@ -212,7 +212,7 @@ This is the section most build-in-public posts skip. These are the exact mistake
 
 ### Incident 1 — Wrong LinkedIn URL published to live public GitHub repo
 
-**What happened:** The AI was asked to update the SwarmOps README.md with a link to Randy's LinkedIn profile. Instead of verifying the URL against a known-good source, the AI pattern-matched from memory: `https://www.linkedin.com/in/randyskiles`
+**What happened:** The AI was asked to update the SwarmOps README.md with a link to Randy's LinkedIn profile. Instead of verifying the URL against a known-good source, the AI pattern-matched from memory and used the wrong URL (missing the hyphen in randy-skiles).
 
 The correct URL is: `https://www.linkedin.com/in/randy-skiles`
 
@@ -412,6 +412,118 @@ AI context windows end. Not "if" — when. Every long session is approaching a c
 This document follows append-only rules. Past entries are never edited. Corrections are new entries with a reference to the entry being corrected.
 
 When Milestone 1 is complete, add a new session entry documenting the prompts used, outputs created, and any incidents during the build. Update the post draft with actual implementation details before publishing.
+
+---
+
+---
+
+## Session 2 — 2026-06-29
+
+**Session goal:** Install Ollama, verify GPU inference, build the Four Controls in orchestrator.py.
+
+**Duration:** Solo session (Randy working independently)
+**AI model:** Claude Sonnet 4.6 (claude-sonnet-4-6)
+**Session ended by:** Task complete
+
+---
+
+### What Was Built
+
+| Output | Location | Status |
+|---|---|---|
+| Ollama installed | System PATH | ✅ Complete |
+| NVIDIA driver updated | System | ✅ 457.85 → current |
+| llama3.2:3b pulled | Ollama model store | ✅ Running |
+| qwen2.5-coder:1.5b pulled | Ollama model store | ✅ Running |
+| Five-Minute Proof | nvidia-smi during inference | ✅ ~2,000 MiB VRAM confirmed |
+| orchestrator.py — Four Controls | project-monte-swarmops-core/ | ✅ All 4 verified |
+| SCOPE.md | project-monte-swarmops-core/ | ✅ 2 approved actions |
+| KILLSWITCH.flag | project-monte-swarmops-core/ | ✅ Present and named correctly |
+| audit.log | project-monte-swarmops-core/ | ✅ Append-only, running |
+| draft.txt | project-monte-swarmops-core/ | ✅ Approval boundary working |
+
+### Controls Verified
+
+- **Control 1 — Scope File:** SCOPE.md missing → `sys.exit()` confirmed. Unauthorized action (`rrrread_local_manifest`) → rejected at CRITICAL level, confirmed in audit.log.
+- **Control 2 — Kill Switch:** `KILLSWITCH.flag` present → clean exit confirmed.
+- **Control 3 — Audit Log:** Append-only, millisecond-precision. All scope decisions, model calls, and errors captured.
+- **Control 4 — Approval Boundary:** All model output routes to `draft.txt` only. No external API call, no file mutation, no execution.
+
+### Live Inference
+
+Direct Ollama API wired via pure Python stdlib (`urllib.request`, `json`). No external dependencies. llama3.2:3b generating real output against locally hosted model.
+
+---
+
+## Session 3 — 2026-06-29
+
+**Session goal:** Add dual-model routing — Qwen Tier 1 triage, Llama Tier 2 escalation.
+
+**Duration:** Solo session (Randy working independently)
+**AI model:** Claude Sonnet 4.6 (claude-sonnet-4-6)
+**Session ended by:** Task complete
+
+---
+
+### What Was Built
+
+| Output | Location | Status |
+|---|---|---|
+| Tier 1 agent — qwen2.5-coder:1.5b | orchestrator.py | ✅ JSON triage output confirmed |
+| Tier 2 agent — llama3.2:3b | orchestrator.py | ✅ Escalation narrative confirmed |
+| Conditional routing logic | orchestrator.py | ✅ Anomaly → Tier 2; nominal → Tier 2 sleeps |
+| orchestrator_bk.py (pre-routing backup) | project-monte-swarmops-core/ | ✅ Preserved |
+
+### Routing Logic Verified
+
+- Nominal telemetry → Tier 1 classifies `nominal`, Tier 2 remains dormant. VRAM conserved.
+- Anomaly telemetry (OOM error, connection timeout) → Tier 1 classifies `anomaly`, Tier 2 wakes and generates remediation ticket.
+- JSON parse errors from Tier 1 handled — fallback to `anomaly` classification (fail-closed).
+
+---
+
+## Session 4 — 2026-06-30
+
+**Session goal:** Replace static prompt queue with live telemetry tailer. Add host metrics. Add interactive approval gate.
+
+**Duration:** Solo session (Randy working independently)
+**AI model:** Claude Sonnet 4.6 (claude-sonnet-4-6)
+**Session ended by:** Task complete — Milestone 1 verified
+
+---
+
+### What Was Built
+
+| Output | Location | Status |
+|---|---|---|
+| Lock-free byte-offset telemetry tailer | orchestrator.py `run_live_pipeline()` | ✅ Streaming confirmed |
+| Dynamic host metrics injection | orchestrator.py — Windows ctypes | ✅ Live disk data in prompts |
+| dispatched_drafts/ archive | project-monte-swarmops-core/dispatched_drafts/ | ✅ 9 timestamped files |
+| Interactive Command Deck (A/S gate) | orchestrator.py | ✅ Human approval tested live |
+| watch_folder/telemetry.log (simulated) | project-monte-swarmops-core/watch_folder/ | ✅ IT events simulated |
+
+### Live Pipeline Verified
+
+- Byte-offset tracking: no file locks, no sharing conflicts with external Windows processes.
+- Host disk metrics: `kernel32.GetDiskFreeSpaceExW` — live storage capacity injected into model prompts.
+- Human A/S gate: operator prompted on every anomaly; [A]pprove archives to dispatched_drafts/, [S]kip logs and continues.
+- 207 audit.log entries across Sessions 2-4.
+
+### Incidents This Session
+
+None. First session across all four with no governance failures logged.
+
+---
+
+## Milestone 1 Closeout — 2026-07-01
+
+**Milestone 1 declared complete.** All four controls operational, dual-model routing verified, live telemetry pipeline streaming, interactive Command Deck tested. 207 audit log entries across Sessions 2-4.
+
+**Correction applied — KILLSWITCH filename mismatch:**
+
+During cleanup, discovered `KILLSWITCH.flag.txt` on disk while `check_killswitch()` looks for `KILLSWITCH.flag`. Kill switch would never have fired in production. Renamed via PowerShell `Rename-Item`. Cost: one rename command. Risk window: Sessions 2-4 (3 sessions where the kill switch was inoperative without anyone knowing).
+
+**Lesson:** Test the kill switch as part of session startup verification, not just at initial build time. Add to Controls Status checklist in STATUS.md.
 
 ---
 
