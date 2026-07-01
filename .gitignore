@@ -17,6 +17,9 @@ sandbox_run.py
 runtime_script.py
 *.db
 *.db-journal
+draft.txt
+dispatched_drafts/
+watch_folder/
 
 # Kill switch (never commit the real one)
 KILLSWITCH.flag
@@ -30,6 +33,9 @@ logs/
 
 # Internal project management (never public)
 STATUS.md
+
+# Private career documents (interview prep, resume strategy — not for public repos)
+docs/SKILLS_AND_PROFESSIONAL_VALUE.md
 
 # OS
 .DS_Store

@@ -58,7 +58,7 @@ PLAN → EXECUTE → AUDIT
 
 ## Build Milestones
 
-- [ ] **Milestone 1** — Core Engine: command whitelist, self-correction loop, audit ledger
+- [x] **Milestone 1** — Core Engine: Four Controls (scope, kill switch, audit log, approval boundary), dual-model routing, live telemetry pipeline
 - [ ] **Milestone 2** — Domain Templates: Active Directory agent, network compliance agent
 - [ ] **Milestone 3** — Hardening Layer: Docker isolation, compliance audit exports
 
@@ -66,7 +66,7 @@ PLAN → EXECUTE → AUDIT
 
 ## Status
 
-Early build. Core controls not yet implemented. Follow progress on [LinkedIn](https://www.linkedin.com/in/randy-skiles).
+Milestone 1 complete. Four Controls built and verified on local hardware. Follow the build on [LinkedIn](https://www.linkedin.com/in/randy-skiles).
 
 ---
 
