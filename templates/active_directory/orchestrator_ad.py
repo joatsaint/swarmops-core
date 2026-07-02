@@ -30,10 +30,17 @@ from datetime import datetime
 
 # ==========================================
 # SYSTEM SETUP & DIRECTORIES
+# Paths anchored to the script's own location so the agent works
+# regardless of which directory PowerShell is sitting in.
 # ==========================================
-WATCH_DIR  = "watch_folder"
-LOG_FILE   = os.path.join(WATCH_DIR, "telemetry.log")
-ARCHIVE_DIR = "dispatched_drafts"
+SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
+WATCH_DIR   = os.path.join(SCRIPT_DIR, "watch_folder")
+LOG_FILE    = os.path.join(WATCH_DIR, "telemetry.log")
+ARCHIVE_DIR = os.path.join(SCRIPT_DIR, "dispatched_drafts")
+
+# Also change working directory to the script folder so SCOPE.md,
+# audit.log, and KILLSWITCH.flag are always found correctly.
+os.chdir(SCRIPT_DIR)
 
 for folder in [WATCH_DIR, ARCHIVE_DIR]:
     if not os.path.exists(folder):

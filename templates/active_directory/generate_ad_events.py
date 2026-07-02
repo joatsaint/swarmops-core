@@ -16,7 +16,10 @@ import random
 import time
 from datetime import datetime
 
-LOG_FILE = os.path.join("watch_folder", "telemetry.log")
+# Anchor to the script's own location so it finds the right watch_folder
+# regardless of which directory PowerShell is sitting in.
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+LOG_FILE   = os.path.join(SCRIPT_DIR, "watch_folder", "telemetry.log")
 
 # AD event definitions: ID → (description, default_severity, sample_accounts)
 AD_EVENTS = {
@@ -66,7 +69,7 @@ def _build_line(event_id):
 
 
 def write_event(line):
-    os.makedirs("watch_folder", exist_ok=True)
+    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(line + "\n")
     print(f"[+] Written: {line}")
