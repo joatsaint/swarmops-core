@@ -632,7 +632,25 @@ The mental model for the kill switch:
 | Test 2 — OOM triage | Confidence score in output, Tier 2 escalation if ≥70 | `Tier 1 Triage complete -> Anomaly: True \| Severity: MEDIUM \| Confidence: 75/100` → Tier 2 escalated, Llama produced Windows-native remediation | ✅ PASS |
 | Test 3 — Wrong kill switch name | Engine refuses to start, names the file | `[X] Incorrectly named kill switch found: 'KILLSWITCH.flag.txt'` → `Fix the above issues before running SwarmOps.` | ✅ PASS |
 
-All 3 tests passed. Project 2 is complete.
+All 3 automated tests passed. Project 2 merged (PR #4, commit 13f29b5).
+
+### Live Demo — Randy's Run (2026-07-02)
+
+Randy ran the engine against real telemetry after the merge. Two events injected:
+
+**Event 1 — DISK at 98% capacity**
+The replacement character `?` (from the em-dash encoding fix) landed inside the log line the Qwen model was asked to triage. Qwen couldn't produce valid JSON with that character in the input string — JSON parse failed. Engine fell closed to `confidence=0`, raised the LOW CONFIDENCE FLAG. Randy typed `S` (skip).
+
+This is correct behavior: a parse failure that should not auto-escalate. The fail-closed path was used exactly as designed.
+
+**Event 2 — Network packet retry count elevated**
+Qwen returned valid JSON: `anomaly=True, severity=MEDIUM, confidence=50/100`. Below the 70 threshold — LOW CONFIDENCE FLAG raised. Randy typed `E` (escalate anyway, operator override). Tier 2 Llama woke up, generated a 3-point remediation ticket with Windows-native steps (no Linux utilities). Randy typed `A` (approve). Ticket committed to dispatched_drafts/ archive.
+
+This is the full confidence calibration loop working live end-to-end: model flags uncertainty → human decides → if escalate, Tier 2 responds → human approves → archived.
+
+**Randy's observation after the demo:** "see. you still need me, how sweet."
+
+That is the product brief in one sentence. The AI caught what it could. The human caught what the AI couldn't. The governance layer made both visible.
 
 ---
 
@@ -658,6 +676,18 @@ with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as log_stream:
 ```
 
 Lesson: any log file that real Windows processes write to cannot be assumed to be UTF-8. The telemetry.log is the intake point for the entire pipeline — it must tolerate whatever encoding the source system uses.
+
+---
+
+---
+
+## Session 6 — 2026-07-02
+
+**Session goal:** Milestone 2 — Active Directory Domain Template. Build the first reusable agent configuration for a specific IT environment so other IT professionals can deploy a working governance agent against their AD logs in under 30 minutes.
+
+**Duration:** Claude Code Mode A session
+**AI model:** Claude Sonnet 4.6 (claude-sonnet-4-6)
+**Session ended by:** In progress
 
 ---
 
