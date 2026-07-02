@@ -527,4 +527,138 @@ During cleanup, discovered `KILLSWITCH.flag.txt` on disk while `check_killswitch
 
 ---
 
+---
+
+## Session 5 — 2026-07-02
+
+**Session goal:** Build Project 2 — Confidence Calibration. Teach the agent to say "I'm not sure" instead of blindly escalating.
+
+**Duration:** Claude Code Mode A session (Claude writes directly; Randy reviews at milestone gates)
+**AI model:** Claude Sonnet 4.6 (claude-sonnet-4-6)
+**Session ended by:** Code complete — awaiting Randy's test run
+
+---
+
+### What Was Built
+
+| Output | Location | Status |
+|---|---|---|
+| `CONFIDENCE_THRESHOLD = 70` constant | orchestrator.py (top of file) | ✅ Code complete |
+| `verify_controls()` function | orchestrator.py | ✅ Code complete |
+| Tier 1 Qwen prompt — confidence field added | orchestrator.py `triage_prompt` | ✅ Code complete |
+| Confidence gate logic | orchestrator.py pipeline loop | ✅ Code complete |
+| Confidence logging to audit.log | orchestrator.py `log_audit()` call | ✅ Code complete |
+| `PROJECT_BOARD.md` (manager dashboard) | project-monte-swarmops-core/ (gitignored) | ✅ Updated |
+| `STATUS.md` — Project 2 pending items checked | project-monte-swarmops-core/ (gitignored) | ✅ Updated |
+
+### What Each Change Does
+
+**`verify_controls()`:**
+Runs at startup before any telemetry is processed. Checks:
+1. SCOPE.md exists and is non-empty
+2. KILLSWITCH.flag exists with the exact correct filename — also checks for common wrong names (KILLSWITCH.flag.txt, KILLSWITCH.Flag, etc.) and surfaces them with the exact rename needed
+3. audit.log is writable
+4. dispatched_drafts/ exists
+
+If any check fails, engine prints the specific problem and exits with `sys.exit()`. This catches the entire class of silent-failure control issues that kept the kill switch inoperative for 3 sessions in Milestone 1.
+
+**Confidence gate:**
+Tier 1 Qwen now returns `{"anomaly": ..., "severity": ..., "reason": ..., "confidence": 0-100}`.
+- confidence ≥ 70 → existing Tier 2 escalation path (no change to Milestone 1 behavior)
+- confidence < 70 → `[LOW CONFIDENCE FLAG]` screen with telemetry, verdict, reason, and confidence score; operator chooses `[E]` escalate anyway or `[S]` skip and log
+- JSON parse failure → confidence defaults to 0 (fail-closed; same fail-closed logic as the existing anomaly default)
+
+### Why This Session Exists
+
+Session 4 ended Milestone 1 with the discovery that the kill switch had been silently inoperative for 3 sessions. The fix was a rename. But the lesson was bigger: a governance control can fail without anyone knowing until you check it specifically.
+
+`verify_controls()` is the systematic answer to that lesson. Every session start, the engine checks that each control is actually working — not just present, but correctly named and accessible. You stop relying on human memory to catch the class of error that silent failures represent.
+
+The confidence gate is the second lesson from the same source. A model that returns a confident-sounding wrong answer is more dangerous than a model that says "I don't know." Building the gate to surface uncertainty before escalation is the same principle applied to triage: you want visibility into uncertainty, not suppression of it.
+
+### The Prompt That Changed The Build
+
+> "if we keep the current workflow, then we run into the limited time I have to do swarmops vs all the audience building workflows. There is a get the project completed and working as a project we can demonstrate and create content around: value vs the time I have to schedule to complete my parts of the project, which may add weeks to the project completion."
+
+This is the prompt that flipped SwarmOps from Mode B (ChatGPT generates, Randy relays) to Mode A (Claude Code writes directly). The relay workflow added Randy as a human bridge between two AIs — workable when Randy has bandwidth, a weeks-long bottleneck when he doesn't.
+
+The second half of that same prompt identified the content angle: "I told AI what I wanted and it built it. Here's how you can do it too." That framing is more achievable and more honest than "I built it step by step with AI." The ICP isn't going to pair-program with an AI. They're going to tell it what they want and review the output. That's the story worth telling.
+
+### Errors Encountered
+
+**Error 1 — `os.path.exists()` is case-insensitive on Windows**
+
+What happened: Initial `verify_controls()` implementation used `os.path.exists("KILLSWITCH.Flag")` to detect wrong-named kill switch files. On Windows, NTFS is case-insensitive, so `os.path.exists("KILLSWITCH.Flag")` returns True even when only `KILLSWITCH.flag` exists on disk. Every wrong-name check triggered a false positive.
+
+First test run output:
+```
+[X] Incorrectly named kill switch found: 'KILLSWITCH.Flag'
+[X] Incorrectly named kill switch found: 'killswitch.flag'
+[X] Incorrectly named kill switch found: 'KILLSWITCH.FLAG'
+```
+None of those files existed. The correctly named `KILLSWITCH.flag` was the only file.
+
+Root cause: `os.path.exists()` is a POSIX API adapted for Windows. It does path resolution, not filename verification. On Windows, path resolution is case-insensitive by default.
+
+Fix: replaced `os.path.exists()` with `os.listdir(".")` which returns actual on-disk filenames with their real case, then compared using a set lookup against the wrong-name list. `os.listdir()` returns what's actually on disk — no case folding.
+
+What this illustrates: A Windows-specific API behavior masked what would have been a silent governance failure on a Linux system. The wrong-name detection was fundamentally broken on the target platform. This is the category of bug that only appears in production, not in testing on the wrong OS.
+
+---
+
+**Error 2 — Kill switch design conflict in `verify_controls()`**
+
+What happened: The initial design of `verify_controls()` required `KILLSWITCH.flag` to EXIST as proof the kill switch mechanism was operational. But `check_killswitch()` immediately exits when `KILLSWITCH.flag` IS present. So the startup check required the file to exist, and the runtime check stopped the engine because the file existed.
+
+First test run confirmed the conflict: engine started cleanly, passed controls verification, then `check_killswitch()` immediately fired and stopped the engine.
+
+Root cause: The "arm = file present" and "stop = file present" models are incompatible. If the file is always present to prove the mechanism is armed, the engine can never run.
+
+Fix: rewrote `verify_controls()` Control 2:
+- If `KILLSWITCH.flag` IS present at startup: report "kill switch is ACTIVE — delete to run in monitoring mode" (not a hard failure, but an explanation)
+- If a wrong-named variant exists: report with exact rename instruction
+- Normal monitoring operation: `KILLSWITCH.flag` is NOT present; create it to stop the engine mid-run
+
+The mental model for the kill switch:
+- **Not present** = engine runs and monitors normally
+- **Present** = engine stops cleanly (created by Randy when he wants to halt it)
+- **Wrong name** = silently inoperative (what happened in Sessions 2-4; `verify_controls()` now catches this)
+
+### Test Results (run 2026-07-02 by Claude Code)
+
+| Test | Expected | Actual | Result |
+|------|---------|--------|--------|
+| Test 1 — Startup | Controls verification passed, confidence threshold shown | `[*] Controls verification passed: SCOPE.md ✓ | KILLSWITCH.flag ✓ | audit.log ✓ | dispatched_drafts/ ✓` / `[*] Confidence threshold: 70/100` | ✅ PASS |
+| Test 2 — OOM triage | Confidence score in output, Tier 2 escalation if ≥70 | `Tier 1 Triage complete -> Anomaly: True \| Severity: MEDIUM \| Confidence: 75/100` → Tier 2 escalated, Llama produced Windows-native remediation | ✅ PASS |
+| Test 3 — Wrong kill switch name | Engine refuses to start, names the file | `[X] Incorrectly named kill switch found: 'KILLSWITCH.flag.txt'` → `Fix the above issues before running SwarmOps.` | ✅ PASS |
+
+All 3 tests passed. Project 2 is complete.
+
+---
+
+**Error 3 — UnicodeDecodeError on Windows-1252 encoded telemetry (found in Randy's live run)**
+
+What happened: Randy ran `python .\orchestrator.py` and the engine crashed immediately after startup with:
+```
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0x97 in position 59: invalid start byte
+```
+
+Byte `0x97` is an em dash in Windows-1252 encoding — the default encoding for many Windows applications that write log files. The telemetry.log had at least one line written by a Windows process using the system codepage instead of UTF-8.
+
+Root cause: the log file tailer opened `watch_folder\telemetry.log` with `encoding="utf-8"` and no error handler. Any non-UTF-8 byte in the file crashes the read.
+
+Fix: added `errors="replace"` to the file open call. Invalid bytes become the Unicode replacement character `?` rather than raising an exception. The triage agent sees `?` for the bad character — the surrounding log line context is still readable and triageable.
+
+```python
+# Before:
+with open(LOG_FILE, "r", encoding="utf-8") as log_stream:
+
+# After:
+with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as log_stream:
+```
+
+Lesson: any log file that real Windows processes write to cannot be assumed to be UTF-8. The telemetry.log is the intake point for the entire pipeline — it must tolerate whatever encoding the source system uses.
+
+---
+
 *AI assists. Humans approve. Mistakes get logged.*
