@@ -636,4 +636,29 @@ All 3 tests passed. Project 2 is complete.
 
 ---
 
+**Error 3 — UnicodeDecodeError on Windows-1252 encoded telemetry (found in Randy's live run)**
+
+What happened: Randy ran `python .\orchestrator.py` and the engine crashed immediately after startup with:
+```
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0x97 in position 59: invalid start byte
+```
+
+Byte `0x97` is an em dash in Windows-1252 encoding — the default encoding for many Windows applications that write log files. The telemetry.log had at least one line written by a Windows process using the system codepage instead of UTF-8.
+
+Root cause: the log file tailer opened `watch_folder\telemetry.log` with `encoding="utf-8"` and no error handler. Any non-UTF-8 byte in the file crashes the read.
+
+Fix: added `errors="replace"` to the file open call. Invalid bytes become the Unicode replacement character `?` rather than raising an exception. The triage agent sees `?` for the bad character — the surrounding log line context is still readable and triageable.
+
+```python
+# Before:
+with open(LOG_FILE, "r", encoding="utf-8") as log_stream:
+
+# After:
+with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as log_stream:
+```
+
+Lesson: any log file that real Windows processes write to cannot be assumed to be UTF-8. The telemetry.log is the intake point for the entire pipeline — it must tolerate whatever encoding the source system uses.
+
+---
+
 *AI assists. Humans approve. Mistakes get logged.*

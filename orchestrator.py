@@ -254,7 +254,7 @@ def run_live_pipeline():
             if os.path.exists(LOG_FILE):
                 current_size = os.path.getsize(LOG_FILE)
                 if current_size > last_position:
-                    with open(LOG_FILE, "r", encoding="utf-8") as log_stream:
+                    with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as log_stream:
                         log_stream.seek(last_position)
                         lines = log_stream.readlines()
                         last_position = log_stream.tell()
