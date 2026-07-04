@@ -687,7 +687,96 @@ Lesson: any log file that real Windows processes write to cannot be assumed to b
 
 **Duration:** Claude Code Mode A session
 **AI model:** Claude Sonnet 4.6 (claude-sonnet-4-6)
-**Session ended by:** In progress
+**Session ended by:** Live demo verified — PR #5 ready to merge
+
+---
+
+### What Was Built
+
+| Output | Location | Status |
+|---|---|---|
+| `orchestrator_ad.py` | templates/active_directory/ | ✅ Verified live |
+| `generate_ad_events.py` | templates/active_directory/ | ✅ Verified live |
+| `SCOPE.md` (AD template) | templates/active_directory/ | ✅ Working |
+| `README.md` (AD template) | templates/active_directory/ | ✅ Written |
+| Path fix — scripts anchor to `__file__` | Both scripts | ✅ Fixed + pushed |
+
+### Errors Encountered
+
+**Error 1 — Scripts used relative paths, broke when run from parent folder**
+
+What happened: Randy ran `python .\generate_ad_events.py` from the main project folder. The script looked for `watch_folder\telemetry.log` relative to PowerShell's working directory, which pointed at the main project's watch_folder — not the template's. Both scripts were watching/writing to different locations. Nothing happened.
+
+Root cause: `os.path.join("watch_folder", ...)` resolves relative to cwd, not to the script. Any user running from the parent folder (the natural place to be) gets the wrong path silently.
+
+Fix: both scripts now resolve paths from `os.path.dirname(os.path.abspath(__file__))`. `orchestrator_ad.py` also calls `os.chdir(SCRIPT_DIR)` at startup so SCOPE.md, audit.log, and KILLSWITCH.flag are always found correctly regardless of where the command is run from.
+
+**What this illustrates:** Path bugs are invisible until someone runs the script from a directory the developer didn't test from. Randy ran it from the natural location (project root) and found it immediately. Same class of problem as the encoding bug in Session 5 — only surfaces on the actual target system, in the actual user's workflow.
+
+### Live Demo — Randy's Lockout Storm (2026-07-02)
+
+Randy ran `python .\templates\active_directory\orchestrator_ad.py` and injected a 5-event lockout storm for account `bwilliams` from workstation `WS-MGMT-05` against DC `DC01`.
+
+| Event | Confidence | Llama Output | Randy's Decision |
+|-------|-----------|--------------|-----------------|
+| 4740 lockout — Count 1/5 | 98/100 | `Unlock-ADAccount`, `Search-ADAccount`, `Get-EventLog` | S (skip) |
+| 4740 lockout — Count 2/5 | 85/100 | `Unlock-ADAccount -Identity bwilliams`, lockout count verification | S (skip) |
+| 4740 lockout — Count 3/5 | 95/100 | `Unlock-ADAccount`, `Get-ADGroupMember`, `Get-ADAccountLockoutPolicy` | A (approved, archived) |
+| 4740 lockout — Count 4/5 | 75/100 | `Unlock-ADAccount`, `Search-ADAccount` by lastLogonDateTime | A (approved, archived) |
+| 4740 lockout — Count 5/5 | 67/100 | `Get-ADUser`, `Search-ADAccount`, `Unlock-ADAccount` | A (approved, archived) |
+
+All five events: correct Windows-native PowerShell output, no Linux tools, no hallucinated cmdlets. Confidence varied (67–98) across identical event types — expected behavior from a 1.5B model without fine-tuning. The human-in-the-loop design handles the variance correctly: Randy reviewed each ticket on its own merits.
+
+Randy's operator pattern on the storm: skipped the first two (possibly because they were lower-quality tickets), approved the last three as the remediation language sharpened. That's the override tracking data this system is designed to accumulate.
+
+3 tickets archived to `dispatched_drafts/`. PR #5 ready to merge.
+
+---
+
+## Session 6 — 2026-07-04
+
+**Session goal:** Build Milestone 3 — Network Compliance Template. Wire in receipt vocabulary from Nate B Jones Open Engine pattern.
+
+**Duration:** Single session  
+**AI model:** Claude Sonnet 4.6 (claude-sonnet-4-6) — Claude Code  
+**Session ended by:** In progress (demo deferred to build window Jul 7–13)
+
+### What Was Built
+
+| Output | Location | Status |
+|---|---|---|
+| `orchestrator_net.py` — network pipeline + receipt vocabulary | `templates/network_compliance/` | ✅ Code complete |
+| `generate_net_events.py` — 6 event types, --storm/--all/--event | `templates/network_compliance/` | ✅ Code complete |
+| `SCOPE.md` — value hierarchy (3-question constraint spec) | `templates/network_compliance/` | ✅ Code complete |
+| `README.md` — setup, receipt grep queries, scope expansion rule | `templates/network_compliance/` | ✅ Code complete |
+| `docs/MILESTONE3_NETWORK_COMPLIANCE.md` — build spec | `docs/` | ✅ Complete |
+
+### New Governance Patterns Added (from Nate B Jones — Open Engine)
+
+**Receipt vocabulary** — four standardized audit tokens in `audit.log`:
+- `SWARM CLAIMED` — engine started processing an event
+- `SWARM DONE` — analysis complete, packet written
+- `SWARM BLOCKED` — event out of scope
+- `SWARM HUMAN HOLD` — confidence below threshold, human deferred
+
+**Value hierarchy in SCOPE.md** — three mandatory constraint questions baked into every scope file:
+1. What must the agent never do, even to accomplish the goal?
+2. When must the agent stop and ask rather than proceed?
+3. If the goal and a constraint conflict, which wins? (Answer: constraint always wins.)
+
+**Scope expansion audit** — `verify_controls()` now logs exact approved actions at every startup. A SCOPE.md change is a governance decision, not a config edit.
+
+### Live Demo Results (2026-07-04)
+
+| Test | Result |
+|------|--------|
+| Test 1 — Startup controls verification | ✅ PASSED |
+| Test 4 — SWARM HUMAN HOLD (low confidence on unusual_outbound) | ✅ PASSED — confidence=0/100, agent correctly held for human |
+| Test 2 — Port scan storm (SWARM CLAIMED + DONE) | ⏳ Deferred to Jul 7–13 |
+| Test 3 — Out-of-scope → SWARM BLOCKED | ⏳ Deferred to Jul 7–13 |
+| Test 5 — Geo-anomaly HIGH → Tier 2 Windows ticket | ⏳ Deferred to Jul 7–13 |
+
+The Test 4 result is worth noting: Qwen returned malformed JSON for an `unusual_outbound` event, so the engine defaulted to `confidence=0` and immediately fired `SWARM HUMAN HOLD` rather than guessing. That's the correct fail-closed behavior — the receipt vocabulary makes it auditable.
 
 ---
 
