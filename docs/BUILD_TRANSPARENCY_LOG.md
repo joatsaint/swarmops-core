@@ -766,17 +766,46 @@ Randy's operator pattern on the storm: skipped the first two (possibly because t
 
 **Scope expansion audit** — `verify_controls()` now logs exact approved actions at every startup. A SCOPE.md change is a governance decision, not a config edit.
 
-### Live Demo Results (2026-07-04)
+### Live Demo Results (2026-07-04 + 2026-07-05)
 
 | Test | Result |
 |------|--------|
-| Test 1 — Startup controls verification | ✅ PASSED |
-| Test 4 — SWARM HUMAN HOLD (low confidence on unusual_outbound) | ✅ PASSED — confidence=0/100, agent correctly held for human |
-| Test 2 — Port scan storm (SWARM CLAIMED + DONE) | ⏳ Deferred to Jul 7–13 |
-| Test 3 — Out-of-scope → SWARM BLOCKED | ⏳ Deferred to Jul 7–13 |
-| Test 5 — Geo-anomaly HIGH → Tier 2 Windows ticket | ⏳ Deferred to Jul 7–13 |
+| Test 1 — Startup controls verification | ✅ PASSED 2026-07-04 |
+| Test 4 — SWARM HUMAN HOLD (low confidence on unusual_outbound) | ✅ PASSED 2026-07-04 — confidence=0/100, agent correctly held for human |
+| Test 2 — Port scan storm (SWARM CLAIMED + DONE) | ✅ PASSED 2026-07-05 |
+| Test 3 — Out-of-scope → SWARM BLOCKED | ✅ PASSED 2026-07-05 |
+| Test 5 — Geo-anomaly HIGH → Tier 2 Windows ticket | ✅ PASSED 2026-07-05 |
 
-The Test 4 result is worth noting: Qwen returned malformed JSON for an `unusual_outbound` event, so the engine defaulted to `confidence=0` and immediately fired `SWARM HUMAN HOLD` rather than guessing. That's the correct fail-closed behavior — the receipt vocabulary makes it auditable.
+**All 5 acceptance criteria verified live. Milestone 3 complete.**
+
+Randy ran the full two-window test on 2026-07-05: `orchestrator_net.py` in Window 1, `generate_net_events.py --storm` in Window 2. Port scan storm events processed correctly — `SWARM CLAIMED` and `SWARM DONE` receipt tokens in audit.log for each event. Tier 2 Llama generated Windows-native remediation tickets (netstat/netsh/Get-NetFirewallRule cmdlets only, no Linux tools). Human A/S gate prompted correctly on each event.
+
+The Test 4 result from 2026-07-04 is worth noting: Qwen returned malformed JSON for an `unusual_outbound` event, so the engine defaulted to `confidence=0` and immediately fired `SWARM HUMAN HOLD` rather than guessing. That's the correct fail-closed behavior — the receipt vocabulary makes it auditable.
+
+---
+
+## Session 7 — 2026-07-05
+
+**Session goal:** Verify Milestone 3 live demo, open PR, update all documentation.
+
+**Duration:** Claude Code session  
+**AI model:** Claude Sonnet 4.6  
+**Session ended by:** M3 live demo confirmed — PR opened
+
+### What Was Done
+
+- Full M3 live demo verified by Randy: two-window test passed (all 5 acceptance criteria)
+- PR opened: `feat/milestone3-network-compliance`
+- `docs/BUILD_TRANSPARENCY_LOG.md` — M3 results updated (this entry)
+- `docs/SKILLS_AND_PROFESSIONAL_VALUE.md` — M3 evidence added
+- `STATUS.md` — all M3 checkboxes cleared; Current Objective updated to M4
+- `docs/MILESTONE3_NETWORK_COMPLIANCE.md` — build log filled in
+
+### Clarification that changed the build narrative
+
+During the session, Randy clarified that he cannot run SwarmOps against live infrastructure (real AD, real firewall). The simulation generator (`generate_net_events.py`) IS the test harness — it produces telemetry that is indistinguishable from what real systems would emit. The two-window test IS the live demo. This is the correct architecture for a governance template: it must be testable without owning enterprise infrastructure.
+
+**Professional value:** A governance tool that requires a $50K lab to test is not a deployable governance tool. SwarmOps templates are self-contained — generator included. Any IT pro can verify the governance layer works before pointing it at production systems.
 
 ---
 
