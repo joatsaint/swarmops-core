@@ -2,33 +2,40 @@
 
 **Project:** SwarmOps / MONTE — local-first, zero-token AI governance layer for IT pros
 **Status:** ACTIVE
-**Last updated:** 2026-07-09
+**Last updated:** 2026-07-10
 
 ## Where we left off
 
-Milestone 1 + 2 complete. Milestone 4 (Ollama-based dynamic file classifier)
-just shipped: `file_categorizer.py` rewritten from scratch with zero
-hardcoded categories — it discovers categories from file content via Ollama
-(3-phase: discovery → classification → move), plus `approval_gate.py` for
-manual review of low-confidence files. Tested live against 11 real files:
-8 moved automatically, 1 to `_needs_human_review/`, 2 to `_the_junk_drawer/`.
-Committed and merged as **PR #7** in this repo (`github.com/joatsaint/swarmops-core`).
+Milestones 1-4 all complete. Milestone 4 (Ollama-based dynamic file
+classifier) is fully shipped and verified live:
+- `file_categorizer.py` — zero hardcoded categories, discovers them from
+  file content via Ollama (3-phase: discovery → classification → move),
+  auto-moves high-confidence files, and now also renames every file with a
+  short descriptive name generated from its content (added 2026-07-10 —
+  no more sorting through `New Text Document (247).txt`)
+- `approval_gate.py` — rewritten 2026-07-10 to match the current
+  `categorizer_results.json` schema (an earlier version was built against
+  an incompatible older schema and would not have worked). Reads
+  `_needs_human_review/`, shows the AI's suggested category + confidence +
+  reasoning per file, lets the operator accept/reassign/skip.
+- Verified live end-to-end against the real 11-file test set: high-confidence
+  files auto-moved and auto-renamed correctly, low-confidence files parked
+  for review, accept/skip paths both tested working, zero cloud tokens used.
 
-A companion 7-scene HeyGen build-video script documenting this work was
-also written (lives in the parent project's memory —
-`youtube-downloader/memory/HOT_STATE.md` — since it's a content-pipeline
-asset, not SwarmOps code).
+A companion HeyGen build-video script documenting this work — now expanded
+to 8 scenes with a new opening hook — lives in the parent project at
+`video-production/long-form/file-organizer-build/script.md` (content-
+pipeline asset, not SwarmOps code, kept out of this repo).
 
 ## Exact next step
 
-**Milestone 3 — Network Compliance** is next up. Parallel hard deadline:
-the Milestone 3 demo (Tests 2, 3, 5 from `PROJECT_BOARD.md`) must be
-complete before the **Jul 14** MONTE-1 Buffer post goes out.
+No confirmed next milestone yet — `PROJECT_BOARD.md` in this folder is
+stale (last updated 2026-07-02, predates Milestones 3 and 4) and should not
+be trusted for current status. Decide and update `PROJECT_BOARD.md` before
+starting new work, rather than assuming it's still accurate.
 
-Before Milestone 3 work starts, confirm current state against
-`PROJECT_BOARD.md` and `STATUS.md` in this folder — they are this repo's
-existing tracking files and take precedence over anything summarized here
-if they disagree.
+The next video in the series needs to mention the new file-renaming
+feature — flagged in the parent project's script notes.
 
 ## Project boundary
 

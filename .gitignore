@@ -28,6 +28,11 @@ KILLSWITCH.flag
 audit.log
 logs/
 
+# file_categorizer.py run output (generated per-run, not source)
+categorizer_results.json
+classification_results.json
+classification_report.txt
+
 # Local model cache
 .ollama/
 

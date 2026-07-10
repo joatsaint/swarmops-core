@@ -17,6 +17,7 @@ Usage:
 """
 
 import os
+import re
 import sys
 import json
 import random
@@ -56,6 +57,8 @@ JUNK_DRAWER_FOLDER = "_the_junk_drawer"
 RESULTS_FILE = "categorizer_results.json"
 
 RESERVED_FOLDERS = {NEEDS_REVIEW_FOLDER, JUNK_DRAWER_FOLDER}
+MAX_SUGGESTED_NAME_LEN = 60
+ILLEGAL_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
 # ============================================================
@@ -138,6 +141,17 @@ def discover_categories(files: list) -> list:
         sys.exit(1)
 
 
+def sanitize_suggested_filename(name) -> str | None:
+    """Clean up Ollama's suggested filename: strip illegal chars, cap length,
+    fall back to None (meaning: keep original name) if nothing usable comes back."""
+    if not name or not isinstance(name, str):
+        return None
+    cleaned = ILLEGAL_FILENAME_CHARS.sub("", name).strip().strip(".")
+    cleaned = re.sub(r"\s+", "_", cleaned)
+    cleaned = cleaned[:MAX_SUGGESTED_NAME_LEN].strip("_")
+    return cleaned or None
+
+
 # ============================================================
 # PHASE 2 — CLASSIFY ONE FILE
 # ============================================================
@@ -151,14 +165,19 @@ def classify_file(file_path: Path, categories: list) -> dict:
         f"CATEGORIES:\n{category_list}\n- no_fit\n\n"
         f"FILE NAME: {file_path.name}\n"
         f"FILE CONTENT:\n---\n{sample}\n---\n\n"
+        f"Also suggest a short, descriptive filename (no extension) based on what the "
+        f"file actually contains — this replaces generic names like 'New Text Document "
+        f"(247)'. Rules: 3 to 6 words, lowercase, words separated by underscores, no "
+        f"special characters, specific enough to identify the file's content at a glance.\n\n"
         f"Return valid JSON only. No markdown. No explanation.\n"
-        f'{{"category": "...", "confidence": 0-100, "reason": "one sentence"}}'
+        f'{{"category": "...", "confidence": 0-100, "reason": "one sentence", '
+        f'"suggested_filename": "short_descriptive_name"}}'
     )
 
     raw = query_ollama(prompt)
 
     if raw.startswith(("CONNECTION_ERROR", "HTTP_ERROR", "EXCEPTION")):
-        return {"category": "no_fit", "confidence": 0, "reason": raw, "error": raw}
+        return {"category": "no_fit", "confidence": 0, "reason": raw, "error": raw, "suggested_filename": None}
 
     try:
         clean = raw.strip().replace("```json", "").replace("```", "").strip()
@@ -174,12 +193,19 @@ def classify_file(file_path: Path, categories: list) -> dict:
         category = parsed.get("category", "no_fit")
         confidence = int(parsed.get("confidence", 0))
         reason = parsed.get("reason", "")
+        suggested_filename = sanitize_suggested_filename(parsed.get("suggested_filename"))
 
         if category not in categories and category != "no_fit":
             category = "no_fit"
             confidence = max(0, confidence - 20)
 
-        return {"category": category, "confidence": confidence, "reason": reason, "error": None}
+        return {
+            "category": category,
+            "confidence": confidence,
+            "reason": reason,
+            "error": None,
+            "suggested_filename": suggested_filename,
+        }
 
     except (json.JSONDecodeError, ValueError):
         return {
@@ -187,23 +213,44 @@ def classify_file(file_path: Path, categories: list) -> dict:
             "confidence": 0,
             "reason": f"Parse failure: {raw[:100]}",
             "error": "PARSE_FAILURE",
+            "suggested_filename": None,
         }
 
 
 # ============================================================
 # PHASE 3 — MOVE FILES
 # ============================================================
-def move_file(file_path: Path, dest_folder: Path, dry_run: bool) -> bool:
+def resolve_dest_name(dest_folder: Path, base_name: str, extension: str) -> str:
+    """Avoid collisions: file.txt -> file (2).txt -> file (3).txt ..."""
+    candidate = f"{base_name}{extension}"
+    if not (dest_folder / candidate).exists():
+        return candidate
+    n = 2
+    while (dest_folder / f"{base_name} ({n}){extension}").exists():
+        n += 1
+    return f"{base_name} ({n}){extension}"
+
+
+def move_file(file_path: Path, dest_folder: Path, dry_run: bool, suggested_filename: str = None) -> tuple[bool, str]:
+    """Moves file_path into dest_folder, optionally renaming it to
+    suggested_filename (original extension always preserved). Returns
+    (success, final_filename_used)."""
     dest_folder.mkdir(parents=True, exist_ok=True)
-    dest = dest_folder / file_path.name
+
+    if suggested_filename:
+        final_name = resolve_dest_name(dest_folder, suggested_filename, file_path.suffix)
+    else:
+        final_name = file_path.name
+
+    dest = dest_folder / final_name
     if dry_run:
-        return True
+        return True, final_name
     try:
         shutil.move(str(file_path), str(dest))
-        return True
+        return True, final_name
     except Exception as e:
         print(f"  [ERROR] Could not move {file_path.name}: {e}")
-        return False
+        return False, file_path.name
 
 
 # ============================================================
@@ -261,37 +308,42 @@ def run(target_dir: str, voice: bool = False, dry_run: bool = False) -> None:
         print(f"[{i:>3}/{len(files)}] {file_path.name}", end="  ", flush=True)
         result = classify_file(file_path, categories)
 
+        suggested_name = result.get("suggested_filename")
+
         if result["category"] == "no_fit":
             dest = target / JUNK_DRAWER_FOLDER
-            move_file(file_path, dest, dry_run)
+            _, final_name = move_file(file_path, dest, dry_run, suggested_name)
             junk.append({
                 "file": file_path.name,
+                "renamed_to": final_name if final_name != file_path.name else None,
                 "reason": result["reason"],
                 "confidence": result["confidence"],
             })
-            print(f"→ {JUNK_DRAWER_FOLDER}/  ({result['confidence']}/100)")
+            print(f"→ {JUNK_DRAWER_FOLDER}/{final_name}  ({result['confidence']}/100)")
 
         elif result["confidence"] < CONFIDENCE_THRESHOLD:
             dest = target / NEEDS_REVIEW_FOLDER
-            move_file(file_path, dest, dry_run)
+            _, final_name = move_file(file_path, dest, dry_run, suggested_name)
             needs_review.append({
                 "file": file_path.name,
+                "renamed_to": final_name if final_name != file_path.name else None,
                 "suggested_category": result["category"],
                 "confidence": result["confidence"],
                 "reason": result["reason"],
             })
-            print(f"→ {NEEDS_REVIEW_FOLDER}/  {result['category']} ({result['confidence']}/100)")
+            print(f"→ {NEEDS_REVIEW_FOLDER}/{final_name}  {result['category']} ({result['confidence']}/100)")
 
         else:
             dest = target / result["category"]
-            move_file(file_path, dest, dry_run)
+            _, final_name = move_file(file_path, dest, dry_run, suggested_name)
             moved.append({
                 "file": file_path.name,
+                "renamed_to": final_name if final_name != file_path.name else None,
                 "category": result["category"],
                 "confidence": result["confidence"],
                 "reason": result["reason"],
             })
-            print(f"→ {result['category']}/  ({result['confidence']}/100)")
+            print(f"→ {result['category']}/{final_name}  ({result['confidence']}/100)")
 
     # Write results
     results = {
