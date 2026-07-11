@@ -39,6 +39,10 @@ classification_report.txt
 # Internal project management (never public)
 STATUS.md
 PROJECT_BOARD.md
+docs/PROJECT3_CONCEPTS.md
+
+# Backup/scratch files (not source, not for public repo)
+orchestrator_bk.py
 
 # Private career documents (interview prep, resume strategy — not for public repos)
 docs/SKILLS_AND_PROFESSIONAL_VALUE.md
