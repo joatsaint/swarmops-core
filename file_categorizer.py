@@ -30,6 +30,13 @@ import urllib.error
 from datetime import datetime
 from pathlib import Path
 
+# Force line-buffering regardless of execution context. Python fully buffers
+# stdout (only flushes when the buffer fills or the program exits) whenever
+# stdout isn't attached to an interactive terminal — which silently broke the
+# scrolling heartbeat during a real recorded run: the categorization worked
+# correctly, but zero status text reached the screen until the buffer filled.
+sys.stdout.reconfigure(line_buffering=True)
+
 SPEAK_PY = Path(__file__).parent.parent / "phigmund" / "speak.py"
 
 def phigmund_speak(text: str = None, event: str = None, mode: str = "standard") -> None:
