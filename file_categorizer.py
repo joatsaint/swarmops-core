@@ -90,11 +90,39 @@ def query_ollama(prompt: str, timeout: int = 90) -> str:
 # FILE READING
 # ============================================================
 def read_file_sample(file_path: Path, max_chars: int = MAX_CHARS_PER_FILE) -> str:
+    """
+    Reads a representative sample of the file, not just the head.
+
+    Real problem found 2026-07-13: reading only the first `max_chars` badly
+    misrepresents most files in a real corpus — 140/153 test files exceeded
+    2000 chars (median 15,404, max 934,545), so classification/naming was
+    built from a small, non-representative opening slice. A transcript whose
+    real subject only shows up after a long preamble would get classified
+    and named after the preamble instead.
+
+    Fix: for files larger than max_chars, take three evenly-spaced chunks
+    (beginning, middle, end) instead of one chunk from the start. Small
+    files (the common case for short notes) are unaffected — full content
+    is still returned as before.
+    """
     try:
         with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-            return f.read(max_chars)
+            text = f.read()
     except Exception as e:
         return f"[UNREADABLE: {e}]"
+
+    if len(text) <= max_chars:
+        return text
+
+    chunk_size = max_chars // 3
+    start = text[:chunk_size]
+    mid_point = len(text) // 2
+    middle = text[mid_point - chunk_size // 2: mid_point + chunk_size // 2]
+    end = text[-chunk_size:]
+    return (
+        f"{start}\n\n[...excerpt from the middle of the file...]\n\n"
+        f"{middle}\n\n[...excerpt from the end of the file...]\n\n{end}"
+    )
 
 
 # ============================================================
