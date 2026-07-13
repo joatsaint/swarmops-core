@@ -23,6 +23,8 @@ import json
 import random
 import shutil
 import subprocess
+import threading
+import time
 import urllib.request
 import urllib.error
 from datetime import datetime
@@ -218,6 +220,39 @@ def classify_file(file_path: Path, categories: list) -> dict:
 
 
 # ============================================================
+# SCREEN-RECORDING HEARTBEAT
+# ============================================================
+_HEARTBEAT_LINES = [
+    "      [*] reading file content...",
+    "      [*] querying llama3.2:3b...",
+    "      [*] evaluating category fit...",
+    "      [*] checking confidence threshold...",
+]
+
+
+def _classify_with_heartbeat(file_path: Path, categories: list) -> dict:
+    """Runs classify_file() on a background thread while printing genuinely
+    new scrolling status lines on the main thread every ~0.4s. Without this,
+    the terminal sits frozen on one line for the several seconds each Ollama
+    call takes — looks like a stalled/frozen screen on a recording instead of
+    live activity. Purely cosmetic — does not change classification logic."""
+    result_box = {}
+
+    def _target():
+        result_box["value"] = classify_file(file_path, categories)
+
+    t = threading.Thread(target=_target)
+    t.start()
+    i = 0
+    while t.is_alive():
+        print(_HEARTBEAT_LINES[i % len(_HEARTBEAT_LINES)])
+        i += 1
+        time.sleep(0.4)
+    t.join()
+    return result_box["value"]
+
+
+# ============================================================
 # PHASE 3 — MOVE FILES
 # ============================================================
 def resolve_dest_name(dest_folder: Path, base_name: str, extension: str) -> str:
@@ -305,8 +340,8 @@ def run(target_dir: str, voice: bool = False, dry_run: bool = False) -> None:
     junk = []
 
     for i, file_path in enumerate(files, 1):
-        print(f"[{i:>3}/{len(files)}] {file_path.name}", end="  ", flush=True)
-        result = classify_file(file_path, categories)
+        print(f"[{i:>3}/{len(files)}] {file_path.name}")
+        result = _classify_with_heartbeat(file_path, categories)
 
         suggested_name = result.get("suggested_filename")
 
