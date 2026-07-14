@@ -178,6 +178,32 @@ def discover_categories(files: list) -> list:
         sys.exit(1)
 
 
+# ============================================================
+# PII SAFETY NET — deterministic, independent of the LLM
+# ============================================================
+# Real problem found 2026-07-13, during an actual recorded run: PII safety
+# depended entirely on the LLM's own classification confidence that turn.
+# Same test file landed in _needs_human_review on one run and
+# _the_junk_drawer on the next — non-deterministic, not a reliable safety
+# net. Regex pattern matching doesn't depend on the model's mood; it either
+# matches or it doesn't, every time.
+_PII_PATTERNS = {
+    "SSN":         re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
+    "phone":       re.compile(r"\b(?:\(\d{3}\)\s?|\d{3}[-.\s])?\d{3}[-.\s]\d{4}\b"),
+    "email":       re.compile(r"\b[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}\b"),
+    "credit_card": re.compile(r"\b(?:\d[ -]?){13,16}\b"),
+}
+
+
+def _detect_pii(text: str) -> list[str]:
+    """Returns the list of PII pattern types found in text, e.g. ['SSN', 'phone']."""
+    found = []
+    for label, pattern in _PII_PATTERNS.items():
+        if pattern.search(text):
+            found.append(label)
+    return found
+
+
 def sanitize_suggested_filename(name) -> str | None:
     """Clean up Ollama's suggested filename: strip illegal chars, cap length,
     fall back to None (meaning: keep original name) if nothing usable comes back."""
@@ -214,7 +240,15 @@ def classify_file(file_path: Path, categories: list) -> dict:
     raw = query_ollama(prompt)
 
     if raw.startswith(("CONNECTION_ERROR", "HTTP_ERROR", "EXCEPTION")):
-        return {"category": "no_fit", "confidence": 0, "reason": raw, "error": raw, "suggested_filename": None}
+        pii_found = _detect_pii(sample)
+        return {
+            "category": "Uncategorized" if pii_found else "no_fit",
+            "confidence": (CONFIDENCE_THRESHOLD - 1) if pii_found else 0,
+            "reason": (f"PII detected ({', '.join(pii_found)}) — flagged for review. " if pii_found else "") + raw,
+            "error": raw,
+            "suggested_filename": None,
+            "pii_flags": pii_found,
+        }
 
     try:
         clean = raw.strip().replace("```json", "").replace("```", "").strip()
@@ -236,21 +270,35 @@ def classify_file(file_path: Path, categories: list) -> dict:
             category = "no_fit"
             confidence = max(0, confidence - 20)
 
+        pii_found = _detect_pii(sample)
+        if pii_found:
+            # Force this file to _needs_human_review regardless of what the
+            # LLM decided — never let a PII hit land in the junk drawer or
+            # get auto-filed on LLM confidence alone. See PII SAFETY NET above.
+            if category == "no_fit":
+                category = "Uncategorized"
+            confidence = min(confidence, CONFIDENCE_THRESHOLD - 1)
+            reason = f"PII detected ({', '.join(pii_found)}) — flagged for review regardless of category confidence. {reason}".strip()
+
         return {
             "category": category,
             "confidence": confidence,
             "reason": reason,
             "error": None,
             "suggested_filename": suggested_filename,
+            "pii_flags": pii_found,
         }
 
     except (json.JSONDecodeError, ValueError):
+        pii_found = _detect_pii(sample)
         return {
-            "category": "no_fit",
-            "confidence": 0,
-            "reason": f"Parse failure: {raw[:100]}",
+            "category": "Uncategorized" if pii_found else "no_fit",
+            "confidence": (CONFIDENCE_THRESHOLD - 1) if pii_found else 0,
+            "reason": (f"PII detected ({', '.join(pii_found)}) — flagged for review. "
+                       if pii_found else "") + f"Parse failure: {raw[:100]}",
             "error": "PARSE_FAILURE",
             "suggested_filename": None,
+            "pii_flags": pii_found,
         }
 
 
