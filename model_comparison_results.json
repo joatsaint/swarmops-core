@@ -1,0 +1,12 @@
+{
+  "llama3.2:3b": {
+    "parse_ok": 324,
+    "parse_fail": 22,
+    "agrees_with_real": 152
+  },
+  "qwen2.5-coder:1.5b": {
+    "parse_ok": 345,
+    "parse_fail": 1,
+    "agrees_with_real": 157
+  }
+}

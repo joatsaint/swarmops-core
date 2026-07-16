@@ -57,7 +57,7 @@ def phigmund_speak(text: str = None, event: str = None, mode: str = "standard") 
 # CONFIG
 # ============================================================
 CONFIDENCE_THRESHOLD = 70
-OLLAMA_MODEL = "llama3.2:3b"
+OLLAMA_MODEL = "qwen2.5-coder:1.5b"
 DISCOVERY_SAMPLE_CHARS = 500
 MAX_CHARS_PER_FILE = 2000
 DISCOVERY_MAX_FILES = 40
@@ -261,8 +261,13 @@ def classify_file(file_path: Path, categories: list) -> dict:
         # Handle double-encoded JSON (Ollama returns a string instead of a dict)
         if isinstance(parsed, str):
             parsed = json.loads(parsed)
-        category = parsed.get("category", "no_fit")
-        confidence = int(parsed.get("confidence", 0))
+        # Real bug found 2026-07-14 during a Qwen-vs-Llama comparison test:
+        # .get(key, default) only applies the default when the key is
+        # ABSENT — if the model returns "confidence": null (present but
+        # null), .get() returns None, not 0, and int(None) crashes. Use
+        # `or` to also catch the null-but-present case.
+        category = parsed.get("category") or "no_fit"
+        confidence = int(parsed.get("confidence") or 0)
         reason = parsed.get("reason", "")
         suggested_filename = sanitize_suggested_filename(parsed.get("suggested_filename"))
 
@@ -307,7 +312,7 @@ def classify_file(file_path: Path, categories: list) -> dict:
 # ============================================================
 _HEARTBEAT_LINES = [
     "      [*] reading file content...",
-    "      [*] querying llama3.2:3b...",
+    f"      [*] querying {OLLAMA_MODEL}...",
     "      [*] evaluating category fit...",
     "      [*] checking confidence threshold...",
 ]
